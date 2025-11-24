@@ -2,10 +2,8 @@
 <img src="assets/imgs/icon.png" width="90"/>
 </div>
 
-<h1 align="center">
-  <span style="color: #FF6600;">Target-Bench:</span> <br>
-  <span style="font-size: 0.6em; color: black;">Can World Models Achieve Mapless Path Planning with Semantic Targets?</span>
-</h1>
+<h1 align="center">Target-Bench:</h1>
+<h3 align="center">Can World Models Achieve Mapless Path Planning with Semantic Targets?</h3>
 
 <div align='center'>
 
