@@ -7,7 +7,7 @@
 
 <div align='center'>
 
-🎯 [Project Page](https://target-bench.github.io/) • 📄 [Paper](https://target-bench.github.io/resources/TargetBench.pdf)
+🎯 [Project Page](https://target-bench.github.io/) • 📄 [Paper](https://target-bench.github.io/resources/TargetBench.pdf) • 🤗 [Dataset](https://huggingface.co/target-bench) 
 
 ![teaser](assets/imgs/teaser.gif)
 
@@ -19,7 +19,7 @@
 
 ## TODO &#128203;<a name="todo"></a>
 
-- [ ] Dataset release (scheduled `[2025/12/01]`)
-- [ ] Benchmark & fine-tune code release (scheduled `[2025/12/05]`)
+- [ ] Benchmark & fine-tune code release (scheduled `[2025/12/01]`)
+- [x] Dataset release
 - [x] Paper release
 - [x] Website launch
