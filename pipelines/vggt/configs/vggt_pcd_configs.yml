@@ -1,0 +1,32 @@
+# VGGT Point Cloud Processing Configuration
+
+# Model and processing settings
+model:
+  confidence_threshold: 0.5  # Minimum confidence threshold for including points
+  apply_sky_mask: true       # Whether to apply sky segmentation mask
+
+# PCD post-processing settings (applied in order)
+post_processing:
+  # 1. Coordinate sequence fixer (x,z,y) -> (x,y,z)
+  fix_coordinates:
+    enabled: true
+    
+  # 2. Point filtering by z-coordinate
+  filter_points:
+    enabled: true
+    min_z: -2.0 # Minimum z value (inclusive) - points below this will be removed
+    max_z: 1.4   # Maximum z value (inclusive) - points above this will be removed
+    # Points are kept only if min_z <= z <= max_z
+    
+# Path settings
+paths:
+  pkl_dir: "dataset/navsim_logs/mini"
+  images_base_path: "dataset/sensor_blobs/mini"
+  output_base_path: "dataset/sensor_blobs/mini"
+  camera_params_json: "camera_para.json"
+
+# Camera settings
+cameras:
+  # Available cameras (comment out to use subset)
+  camera_order: ['CAM_F0', 'CAM_L0', 'CAM_R0']  # Only 3 cameras for faster processing
+  # camera_order: ['CAM_F0', 'CAM_L0', 'CAM_L1', 'CAM_L2', 'CAM_R0', 'CAM_R1', 'CAM_R2', 'CAM_B0']  # All 8 cameras

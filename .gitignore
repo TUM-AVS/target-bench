@@ -1,0 +1,32 @@
+# python
+*.pyc
+**/__pycache__/
+.pytest_cache/*
+.pydevproject
+
+# IDE
+.vscode/
+
+# Pip
+*.egg-info
+
+# files
+*.log
+*.pkl
+*.jpg
+*.pcd
+
+# exp
+exp
+
+# data
+dataset/*
+video_frames
+
+# vggt code
+models/vggt/VGGT-1B
+
+# lsf
+*.bsub
+
+evaluation_results

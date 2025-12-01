@@ -1,0 +1,103 @@
+# Configuration for VIPE SLAM Evaluation
+# This file defines metrics and parameters for evaluating world models using VIPE
+
+# Evaluation Metrics Configuration
+metrics:
+  # Miss Rate (MR) threshold in meters
+  # A prediction is considered a "miss" if it's more than this distance from GT
+  miss_threshold: 2.0
+  
+  # Interpolation strategy for trajectory alignment
+  # Options: 'gt' (interpolate pred to gt length), 'pred' (interpolate gt to pred length),
+  #          'max' (interpolate both to max length), 'min' (trim both to min length)
+  interpolate_mode: 'gt'
+  
+  # Soft Endpoint (SE) configuration
+  # Gaussian kernel standard deviation for soft endpoint metric
+  se_sigma: 1.0
+  
+  # Approach Consistency (AC) configuration
+  ac:
+    # Number of reference points to sample along GT trajectory
+    num_ref_points: 20
+    
+    # Minimum corridor radius in meters
+    sigma_min: 0.5
+    
+    # Maximum corridor radius in meters
+    sigma_max: 1.5
+    
+    # Corridor shape parameter
+    beta: 0.25
+    
+    # Penalty sharpness parameter
+    gamma: 5.0
+
+# Overall Score Configuration
+# Weighted combination of all metrics
+overall_score:
+  # Saturation thresholds (tau) for normalization
+  # Errors beyond these values are capped at 0 score
+  tau_ade: 5.0  # meters - ADE saturation threshold
+  tau_fde: 8.0  # meters - FDE saturation threshold
+  
+  # Weights for combining metrics (must sum to 1.0)
+  weights:
+    ade: 0.25   # Average Displacement Error
+    fde: 0.25   # Final Displacement Error
+    mr: 0.20    # Miss Rate
+    se: 0.15    # Soft Endpoint
+    ac: 0.15    # Approach Consistency
+
+# VIPE SLAM Configuration
+vipe:
+  # SLAM parameters
+  slam:
+    buffer_size: 4096
+    n_views: 1  # Monocular SLAM
+    height: 384
+    width: 512
+    init_disp: 8.0
+    sparse_tracks:
+      name: 'dummy'  # Options: 'dummy' (no sparse tracks), 'cuvslam' (CUDA visual SLAM)
+    
+  # Bundle Adjustment
+  ba:
+    iterations: 2
+    warmup: 8
+    radius: 2
+  
+  # Camera type
+  camera_type: 'pinhole'
+  
+  # Video preprocessing
+  preprocessing:
+    # Number of frames to extract from videos
+    num_frames: 9
+    
+    # Whether to include ground truth first frame
+    include_first_frame: true
+
+# Output Configuration
+output:
+  # Save individual trajectory files
+  save_trajectories: true
+  
+  # Save visualizations
+  save_plots: true
+  
+  # Plot DPI
+  plot_dpi: 300
+  
+  # Save detailed JSON results
+  save_json: true
+  
+  # Save CSV summaries
+  save_csv: true
+
+# Paths (can be overridden via command line)
+paths:
+  segments_dir: "/home/hongyuan/world-decoder/dataset/Benchmark"
+  wm_videos_dir: "/home/hongyuan/world-decoder/dataset/wm_videos"
+  output_dir: "/home/hongyuan/world-decoder/evaluation_results/vipe"
+

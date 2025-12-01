@@ -1,0 +1,34 @@
+model:
+  confidence_threshold: 0.5
+  apply_sky_mask: true
+  track_mode: "offline"  # "offline" or "online"
+  vo_points: 756
+  grid_size: 10
+
+post_processing:
+  fix_coordinates:
+    enabled: true
+  filter_points:
+    enabled: true
+    min_z: -2.0
+    max_z: 0.5
+  scale_coordinates:
+    enabled: true
+    scale_factor: 1.1
+
+paths:
+  segments_dir: "dataset/EgoWalk_samples"
+  output_base_path: "pipelines/spatracker/output"
+  camera_params_json: "camera_para.json"
+
+cameras:
+  camera_order: ['CAM_F0', 'CAM_L0', 'CAM_R0']
+
+spatracker:
+  model_name_offline: "Yuxihenry/SpatialTrackerV2-Offline"
+  model_name_online: "Yuxihenry/SpatialTrackerV2-Online"
+  vggt_model_name: "Yuxihenry/SpatialTrackerV2_Front"
+  fps: 3  # Use higher fps like working inference.py example
+  max_frames_offline: 30  # Reduced from 80 to prevent memory issues
+  max_frames_online: 50   # Reduced from 300 to prevent memory issues  
+  min_video_scale: 224  # Minimum side for video processing

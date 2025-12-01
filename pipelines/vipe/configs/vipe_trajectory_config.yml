@@ -1,0 +1,48 @@
+# Configuration for VIPE trajectory extraction
+
+# Input/Output paths
+paths:
+  segments_dir: "dataset/video_samples"
+  output_base_path: "pipelines/vipe/output"
+
+# VIPE SLAM configuration
+slam:
+  visualize: false
+  buffer: 4096
+  n_views: 1  # Number of camera views (1 for monocular)
+  height: 384
+  width: 512
+  init_disp: 8.0
+  sparse_tracks:
+    type: null  # or 'cuvslam' if using CUDA visual SLAM tracks
+  ba:  # Bundle adjustment parameters
+    iterations: 2
+    warmup: 8
+    radius: 2
+
+# Pipeline configuration
+pipeline:
+  camera_type: 'pinhole'  # Camera type: pinhole, fisheye, etc.
+  instance_segmentation: null  # Set to enable instance segmentation
+  depth_align_model: null  # Depth alignment model (optional)
+
+# Post-processing
+post_processing:
+  scale_factor: 1.0  # Default scale factor if no ground truth available
+  coordinate_transform:
+    enabled: false  # Enable coordinate transformation if needed
+    
+# Visualization settings
+visualization:
+  save_plots: true
+  plot_format: 'png'
+  dpi: 300
+  include_3d: true
+  include_2d: true
+
+# Output formats
+output:
+  save_npy: true  # Save as numpy arrays
+  save_csv: true  # Save as CSV
+  save_json: true  # Save as JSON
+  save_pkl: false  # Save as pickle

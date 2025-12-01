@@ -1,0 +1,38 @@
+# Configuration for World Model Evaluation using VGGT
+
+# Trajectory Metrics Configuration
+metrics:
+  # Miss rate threshold in meters
+  miss_threshold: 1.0
+  
+  # Interpolation mode for trajectory comparison
+  # Options: 'gt', 'pred', 'max', 'min'
+  interpolate_mode: 'gt'
+  
+  # Soft Endpoint parameters
+  se_sigma: 0.5  # tolerance parameter in meters
+  
+  # Approach Consistency parameters
+  ac:
+    num_ref_points: 20      # number of reference points along GT trajectory
+    sigma_min: 0.5         # minimum corridor radius in meters
+    sigma_max: 1.5          # maximum corridor radius in meters
+    beta: 0.25              # corridor shape parameter
+    gamma: 5.0              # penalty sharpness parameter
+
+# Overall Score Configuration (as defined in metrics.md)
+overall_score:
+  # Scale parameters for exponential normalization
+  tau_ade: 1.0  # scale parameter for ADE in meters
+  tau_fde: 1.0  # scale parameter for FDE in meters
+  
+  # Weights for each metric component
+  # Note: These are the default balanced configuration from metrics.md
+  weights:
+    ade: 0.05   # Average Displacement Error
+    fde: 0.10   # Final Displacement Error
+    mr: 0.10    # Miss Rate
+    se: 0.45    # Soft Endpoint
+    ac: 0.20    # Approach Consistency
+  # Note: Weights sum to 0.90 as specified in metrics.md
+
