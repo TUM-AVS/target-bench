@@ -23,10 +23,13 @@ exp
 dataset/wm_videos/*
 dataset/Benchmark/*
 video_frames
-
+DiffSynth-Studio/models/train/ckpts/*
+DiffSynth-Studio/dataset/*
 # vggt code
 models/vggt/VGGT-1B
 
+# models
+DiffSynth-Studio/models/Wan-AI
 # lsf
 *.bsub
 

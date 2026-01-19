@@ -21,10 +21,10 @@ DEFAULT_NEGATIVE_PROMPT = (
 # ---------------------------------------------------------------------------
 # User-configurable settings
 # ---------------------------------------------------------------------------
-BASE_DIR = Path("../dataset/data_inference")
-METADATA_PATH = Path("../dataset/data_inference/metadata.csv")
+BASE_DIR = Path("dataset/data_inference")
+METADATA_PATH = Path("dataset/data_inference/metadata.csv")
 OUTPUT_DIR = None  # Set to Path("custom/output/dir") to override the automatic folder
-LORA_PATH = Path("models/train/Wan2.2-TI2V-5B_lora_single_segment_121_frames/single_segment_epoch-79.safetensors")  # Set to Path("path/to/lora.safetensors") when using LoRA
+LORA_PATH = Path("models/train/ckpts/single_segment_epoch-79.safetensors")  # Set to Path("path/to/lora.safetensors") when using LoRA
 LORA_ALPHA = 1.0
 HEIGHT = 704
 WIDTH = 1280
