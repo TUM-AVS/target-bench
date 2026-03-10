@@ -290,10 +290,10 @@ def compute_overall_score(ade, fde, miss_rate, se, ac,
     # Default weights from metrics.md
     if weights is None:
         weights = {
-            'ade': 0.05,
-            'fde': 0.10,
-            'mr': 0.10,
-            'se': 0.35,
+            'ade': 0.075,
+            'fde': 0.125,
+            'mr': 0.125,
+            'se': 0.375,
             'ac': 0.30
         }
     
