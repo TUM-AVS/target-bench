@@ -3,52 +3,6 @@ from typing import List
 
 from .downloader import download_models, download_customized_models, Preset_model_id, Preset_model_website
 
-from .sd_text_encoder import SDTextEncoder
-from .sd_unet import SDUNet
-from .sd_vae_encoder import SDVAEEncoder
-from .sd_vae_decoder import SDVAEDecoder
-from .lora import get_lora_loaders
-
-from .sdxl_text_encoder import SDXLTextEncoder, SDXLTextEncoder2
-from .sdxl_unet import SDXLUNet
-from .sdxl_vae_decoder import SDXLVAEDecoder
-from .sdxl_vae_encoder import SDXLVAEEncoder
-
-from .sd3_text_encoder import SD3TextEncoder1, SD3TextEncoder2, SD3TextEncoder3
-from .sd3_dit import SD3DiT
-from .sd3_vae_decoder import SD3VAEDecoder
-from .sd3_vae_encoder import SD3VAEEncoder
-
-from .sd_controlnet import SDControlNet
-from .sdxl_controlnet import SDXLControlNetUnion
-
-from .sd_motion import SDMotionModel
-from .sdxl_motion import SDXLMotionModel
-
-from .svd_image_encoder import SVDImageEncoder
-from .svd_unet import SVDUNet
-from .svd_vae_decoder import SVDVAEDecoder
-from .svd_vae_encoder import SVDVAEEncoder
-
-from .sd_ipadapter import SDIpAdapter, IpAdapterCLIPImageEmbedder
-from .sdxl_ipadapter import SDXLIpAdapter, IpAdapterXLCLIPImageEmbedder
-
-from .hunyuan_dit_text_encoder import HunyuanDiTCLIPTextEncoder, HunyuanDiTT5TextEncoder
-from .hunyuan_dit import HunyuanDiT
-from .hunyuan_video_vae_decoder import HunyuanVideoVAEDecoder
-from .hunyuan_video_vae_encoder import HunyuanVideoVAEEncoder
-
-from .flux_dit import FluxDiT
-from .flux_text_encoder import FluxTextEncoder2
-from .flux_vae import FluxVAEEncoder, FluxVAEDecoder
-from .flux_ipadapter import FluxIpAdapter
-
-from .cog_vae import CogVAEEncoder, CogVAEDecoder
-from .cog_dit import CogDiT
-
-from ..extensions.RIFE import IFNet
-from ..extensions.ESRGAN import RRDBNet
-
 from ..configs.model_config import model_loader_configs, huggingface_model_loader_configs, patch_model_loader_configs
 from .utils import load_state_dict, init_weights_on_device, hash_state_dict_keys, split_state_dict_with_prefix
 
@@ -371,25 +325,7 @@ class ModelManager:
 
 
     def load_lora(self, file_path="", state_dict={}, lora_alpha=1.0):
-        if isinstance(file_path, list):
-            for file_path_ in file_path:
-                self.load_lora(file_path_, state_dict=state_dict, lora_alpha=lora_alpha)
-        else:
-            print(f"Loading LoRA models from file: {file_path}")
-            is_loaded = False
-            if len(state_dict) == 0:
-                state_dict = load_state_dict(file_path)
-            for model_name, model, model_path in zip(self.model_name, self.model, self.model_path):
-                for lora in get_lora_loaders():
-                    match_results = lora.match(model, state_dict)
-                    if match_results is not None:
-                        print(f"    Adding LoRA to {model_name} ({model_path}).")
-                        lora_prefix, model_resource = match_results
-                        lora.load(model, state_dict, lora_prefix, alpha=lora_alpha, model_resource=model_resource)
-                        is_loaded = True
-                        break
-            if not is_loaded:
-                print(f"    Cannot load LoRA: {file_path}")
+        raise NotImplementedError("Use WanVideoPipeline.load_lora for Target-Bench LoRA loading.")
 
 
     def load_model(self, file_path, model_names=None, device=None, torch_dtype=None):
@@ -464,4 +400,3 @@ class ModelManager:
     def to(self, device):
         for model in self.model:
             model.to(device)
-

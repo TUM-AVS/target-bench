@@ -1,81 +1,97 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Enable conda commands
-eval "$(conda shell.bash hook)"
+ENV_NAME="${TARGET_BENCH_ENV_NAME:-target-bench-eval}"
+PYTHON_VERSION="${TARGET_BENCH_PYTHON:-3.10}"
+DA3_REPO_DIR="${DA3_REPO_DIR:-models/da3}"
 
-install_vggt() {
-    echo "========================================"
-    echo "Installing VGGT Environment..."
-    echo "========================================"
-    
-    conda create -n vggt python=3.10 -y
-    conda activate vggt
-    
-    # Install dependencies from requirements.txt
-    pip install -r models/vggt/requirements.txt
-    pip install opencv-python huggingface_hub==0.34.4
+load_conda() {
+    if command -v conda >/dev/null 2>&1; then
+        CONDA_BASE="$(conda info --base)"
+        # shellcheck disable=SC1091
+        source "${CONDA_BASE}/etc/profile.d/conda.sh"
+        return
+    fi
 
-    conda deactivate
-    echo "VGGT installation complete."
+    for conda_sh in \
+        "${HOME}/miniconda3/etc/profile.d/conda.sh" \
+        "${HOME}/anaconda3/etc/profile.d/conda.sh" \
+        "/opt/conda/etc/profile.d/conda.sh"; do
+        if [[ -f "${conda_sh}" ]]; then
+            # shellcheck disable=SC1090
+            source "${conda_sh}"
+            return
+        fi
+    done
+
+    echo "conda not found. Please install Miniconda or initialize conda first." >&2
+    exit 1
 }
 
-install_vipe() {
-    echo "========================================"
-    echo "Installing VIPE Environment..."
-    echo "========================================"
-    
-    conda env create -f models/vipe/envs/base.yml
-    conda activate vipe
-    
-    # Install python dependencies
-    pip install -r models/vipe/envs/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
-
-    # Install package in editable mode
-    # Store current directory
-    cd models/vipe
-    pip install --no-build-isolation -e .
-    cd ../../
-    conda deactivate
-    echo "VIPE installation complete."
+env_exists() {
+    conda env list | awk '{print $1}' | grep -qx "${ENV_NAME}"
 }
 
-install_spatracker() {
-    echo "========================================"
-    echo "Installing SpaTracker Environment..."
-    echo "========================================"
-    
-    conda create -n SpaTrack2 python=3.11 -y
-    conda activate SpaTrack2
-    
-    # Install torch specific version as per README
-    python -m pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu124
-    
-    # Install dependencies
-    pip install -r models/spatracker/requirements.txt
-    
-    conda deactivate
-    echo "SpaTracker installation complete."
+check_da3() {
+    if [[ ! -d "${DA3_REPO_DIR}/src/depth_anything_3" ]]; then
+        echo "Depth-Anything-3 source not found: ${DA3_REPO_DIR}/src/depth_anything_3" >&2
+        echo "Expected checkout: git clone https://github.com/ByteDance-Seed/Depth-Anything-3.git models/da3" >&2
+        exit 1
+    fi
 }
 
-# Main execution
-case "$1" in
-    vggt)
-        install_vggt
+install_env() {
+    load_conda
+
+    if ! env_exists; then
+        conda create -n "${ENV_NAME}" "python=${PYTHON_VERSION}" pip -y
+    fi
+
+    conda activate "${ENV_NAME}"
+    python -m pip install -r requirements.txt
+    python -m pip install --no-deps -e models/vggt -e models/vggt-omega
+
+    check_da3
+    verify_env
+}
+
+verify_env() {
+    load_conda
+    conda activate "${ENV_NAME}"
+    export MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/matplotlib-target-bench}"
+    mkdir -p "${MPLCONFIGDIR}"
+
+    python - <<'PY'
+import importlib
+
+for module in [
+    "torch",
+    "cv2",
+    "modelscope",
+    "vggt.models.vggt",
+    "vggt_omega.models",
+]:
+    importlib.import_module(module)
+    print(f"OK: {module}")
+
+da3_adapter = importlib.import_module("pipelines.da3.scale_factor.compute_scale_factor")
+da3_config = da3_adapter.load_config("pipelines/da3/configs/da3_pcd_configs.yml")
+da3_adapter._add_da3_source_paths(da3_config)
+da3_adapter._install_da3_eval_import_stubs()
+importlib.import_module("depth_anything_3.api")
+print("OK: depth_anything_3.api")
+PY
+}
+
+case "${1:-install}" in
+    install)
+        install_env
         ;;
-    vipe)
-        install_vipe
-        ;;
-    spatracker)
-        install_spatracker
-        ;;
-    all)
-        install_vggt
-        install_vipe
-        install_spatracker
+    verify)
+        verify_env
         ;;
     *)
-        echo "Usage: $0 {vggt|vipe|spatracker|all}"
+        echo "Usage: $0 {install|verify}" >&2
         exit 1
         ;;
 esac
-

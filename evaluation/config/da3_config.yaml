@@ -1,0 +1,21 @@
+# Evaluation config for DA3 with the paper weights used in target-bench.
+metrics:
+  miss_threshold: 1.0
+  interpolate_mode: 'gt'
+  se_sigma: 0.5
+  ac:
+    num_ref_points: 20
+    sigma_min: 0.5
+    sigma_max: 1.5
+    beta: 0.25
+    gamma: 5.0
+
+overall_score:
+  tau_ade: 1.0
+  tau_fde: 1.0
+  weights:
+    ade: 0.075
+    fde: 0.125
+    mr: 0.125
+    se: 0.3375
+    ac: 0.3375

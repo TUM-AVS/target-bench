@@ -4,6 +4,10 @@
 model:
   confidence_threshold: 0.5  # Minimum confidence threshold for including points
   apply_sky_mask: true       # Whether to apply sky segmentation mask
+  # Optional local checkpoint override. By default the evaluator uses
+  # checkpoints/vggt/model.pt, or downloads facebook/VGGT-1B there.
+  checkpoint_path: ""
+  checkpoint_dir: checkpoints/vggt
 
 # PCD post-processing settings (applied in order)
 post_processing:

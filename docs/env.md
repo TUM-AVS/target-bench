@@ -1,43 +1,78 @@
 # Environment Setup and Evaluation
 
-This guide explains how to set up the environments and run the evaluation pipeline for Target-Bench.
+Target-Bench evaluation now uses one shared environment for the supported
+backbones:
 
-## 1. Environment Installation
+- VGGT
+- Depth Anything 3
+- VGGT-Omega
 
-Target-Bench uses multiple environments to manage dependencies for different models. You can install them all at once using the provided script.
+The repository keeps only these three evaluation backbones wired into code.
 
-### Install All Environments
-To install support for VGGT, ViPE, and SpaTracker2:
-
-```bash
-bash set_env.sh all
-```
-
-### Individual Environment Installation
-If you only need a specific environment, you can install them individually:
+## Install
 
 ```bash
-# Install only VGGT environment
-bash set_env.sh vggt
-
-# Install only ViPE environment
-bash set_env.sh vipe
-
-# Install only SpaTracker environment
-bash set_env.sh spatracker
+bash set_env.sh install
 ```
 
-## 2. Evaluation Pipeline
+The installer creates `target-bench-eval` by default and installs:
 
-The main evaluation entry point is `evaluation/evaluate.sh`. This script automatically handles environment switching and executes the benchmark for all supported models.
+- Python dependencies from `requirements.txt`
+- editable `models/vggt`
+- editable `models/vggt-omega`
+- vendored Depth Anything 3 source from `${DA3_REPO_DIR:-models/da3}`
 
-### Run Full Evaluation
+Depth Anything 3 is included under `models/da3`. If you want to use a different
+local checkout, set:
 
 ```bash
-bash evaluation/evaluate.sh
+export DA3_REPO_DIR=/path/to/Depth-Anything-3
+bash set_env.sh install
 ```
 
-This script will sequentially:
-1.  **SpaTracker Evaluation**: Activates `SpaTrack2` environment and runs evaluation.
-2.  **VIPE Evaluation**: Activates `vipe` environment and runs evaluation.
-3.  **VGGT Evaluation**: Activates `vggt` environment and runs evaluation.
+## Verify
+
+```bash
+bash set_env.sh verify
+```
+
+The verify step imports `vggt`, `vggt_omega`, `torch`, `cv2`, and the
+Target-Bench DA3 eval adapter.
+
+## Run Evaluation
+
+Use the unified batch entry point:
+
+```bash
+conda activate target-bench-eval
+NUM_SAMPLES=3 bash evaluation/evaluate.sh
+```
+
+Useful environment variables:
+
+- `TARGET_BENCH_ENV_NAME`: conda env name, default `target-bench-eval`
+- `NUM_SAMPLES`: optional sample limit passed to each evaluator
+- `GT_TRAJECTORY_SCOPE`: default `current_to_end`
+- `DA3_MODEL_ID`: default `DA3NESTED-GIANT-LARGE-1.1`
+- `TARGET_BENCH_CHECKPOINT_DIR`: shared local checkpoint/cache directory, default `checkpoints`
+- `VGGT_CHECKPOINT`: optional local VGGT checkpoint path; otherwise downloaded from Hugging Face
+- `VGGT_OMEGA_CHECKPOINT`: optional local VGGT-Omega checkpoint path; otherwise downloaded from Hugging Face after `hf auth login`
+
+By default checkpoints and Hugging Face model files are kept under:
+
+```text
+checkpoints/
+├── da3/
+├── vggt/
+└── vggt_omega/
+```
+
+This directory is git-ignored.
+
+Run an individual backbone through the unified evaluator:
+
+```bash
+python evaluation/evaluate.py --backbone vggt
+python evaluation/evaluate.py --backbone da3 --model_id DA3NESTED-GIANT-LARGE-1.1
+python evaluation/evaluate.py --backbone vggt_omega
+```

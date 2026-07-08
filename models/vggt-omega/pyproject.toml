@@ -1,0 +1,17 @@
+[project]
+name = "vggt-omega"
+version = "0.0.1"
+description = "VGGT-Omega feed-forward camera and depth reconstruction."
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Jianyuan Wang", email = "jianyuan@robots.ox.ac.uk"},
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vggt_omega*"]

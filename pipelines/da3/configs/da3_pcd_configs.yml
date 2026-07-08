@@ -1,0 +1,30 @@
+# Depth Anything 3 pipeline config for target-bench evaluation.
+
+model:
+  # Supported shorthand aliases:
+  #   DA3-GIANT-1.1
+  #   DA3NESTED-GIANT-LARGE-1.1
+  # Full Hugging Face repo IDs also work.
+  model_id: DA3NESTED-GIANT-LARGE-1.1
+  # DA3 Hugging Face files are cached here by default. You can also set
+  # TARGET_BENCH_CHECKPOINT_DIR to move all backbone checkpoints together.
+  checkpoint_dir: checkpoints/da3
+
+  # Optional local official repo/source paths. By default set_env.sh expects
+  # the official checkout at models/da3. You can also set DA3_REPO_DIR or
+  # DA3_SRC_DIR in the environment instead of editing this file.
+  model_source_paths: []
+
+video:
+  # Match the VGGT evaluator: uniformly sample frames across each evaluated
+  # video, then append the benchmark first_frame image for scale alignment.
+  num_frames: 9
+
+inference:
+  process_res: 504
+  process_res_method: upper_bound_resize
+  use_ray_pose: false
+  # target-bench inputs are already ordered with the current frame first.
+  # Do not let DA3 dynamically choose a future frame as the reference.
+  ref_view_strategy: first
+  align_to_input_ext_scale: true

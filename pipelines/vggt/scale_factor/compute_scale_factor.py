@@ -1,32 +1,26 @@
-"""
-Modified to process EgoWalk_samples dataset instead of pkl files.
-
-Key changes:
-1. Replaced process_pkl_files() with process_egowalk_segments()
-2. Added process_single_egowalk_segment() for testing individual segments
-3. Data loading now reads from:
-   - {segment_name}_current_frame.png (current frame)
-   - {segment_name}_first_frame.png (reference frame) 
-   - {segment_name}_metadata.json (contains real displacement)
-   - Move*.mp4 (world model generated video)
-4. Real displacement extracted from metadata.json: ["distance_first_to_current"]["distance_meters"]
-5. Camera positions compared between reference frame and first predicted frame from world model
-6. Results saved to JSON file with summary statistics
-"""
+"""VGGT model setup, video frame extraction, and optional point-cloud helpers."""
 
 import torch
 import numpy as np
-import open3d as o3d
 import os
-import pickle
-import glob
 import cv2
 import json
 import yaml
 import struct
-from pathlib import Path
-import pandas as pd
 import sys
+
+try:
+    import open3d as o3d
+except ImportError:
+    o3d = None
+
+
+def require_open3d():
+    if o3d is None:
+        raise ImportError("open3d is required for point-cloud operations but is not installed.")
+    return o3d
+
+
 # Define project root
 FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(FILE_DIR, "../../../"))
@@ -34,16 +28,13 @@ sys.path.append(os.path.join(PROJECT_ROOT, 'models/vggt'))
 
 from tqdm.auto import tqdm
 from vggt.models.vggt import VGGT
-from vggt.utils.load_fn import load_and_preprocess_images
 from vggt.utils.geometry import unproject_depth_map_to_point_map
-from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 # Sky segmentation imports
 try:
     import onnxruntime
 except ImportError:
     print("onnxruntime not found. Sky segmentation may not work.")
 
-import requests
 import copy
 
 def load_config(config_path="vggt_pcd_configs.yml"):
@@ -83,6 +74,8 @@ def fix_pcd_coordinates(pcd_file_path):
         bool: True if successful, False otherwise
     """
     try:
+        o3d = require_open3d()
+
         # Read the point cloud
         pcd = o3d.io.read_point_cloud(pcd_file_path)
         
@@ -329,15 +322,78 @@ def apply_pcd_post_processing(pcd_file_path, config, scale_factor=None):
         print(f"  2. Filtering points (z range: [{min_z}, {max_z}])...")
         filter_pcd_file(pcd_file_path, min_z, max_z)
 
-def setup_model():
+def _resolve_project_path(path):
+    expanded = os.path.expandvars(os.path.expanduser(path))
+    if not os.path.isabs(expanded):
+        expanded = os.path.join(PROJECT_ROOT, expanded)
+    return os.path.abspath(expanded)
+
+
+def _checkpoint_dir(config=None):
+    model_cfg = (config or {}).get("model", {})
+    env_root = os.environ.get("TARGET_BENCH_CHECKPOINT_DIR")
+    if env_root:
+        return os.path.join(_resolve_project_path(env_root), "vggt")
+
+    if model_cfg.get("checkpoint_dir"):
+        return _resolve_project_path(model_cfg["checkpoint_dir"])
+
+    root = model_cfg.get("checkpoint_root") or "checkpoints"
+    return os.path.join(_resolve_project_path(root), "vggt")
+
+
+def _candidate_checkpoint_paths(config=None, checkpoint_path=None):
+    paths = []
+    if checkpoint_path:
+        paths.append(checkpoint_path)
+
+    env_checkpoint = os.environ.get("VGGT_CHECKPOINT")
+    if env_checkpoint:
+        paths.append(env_checkpoint)
+
+    model_cfg = (config or {}).get("model", {})
+    config_checkpoint = model_cfg.get("checkpoint_path")
+    if config_checkpoint:
+        paths.append(config_checkpoint)
+
+    paths.append(os.path.join(_checkpoint_dir(config), "model.pt"))
+    paths.append(os.path.join(PROJECT_ROOT, "models/vggt/VGGT-1B/model.pt"))
+    return paths
+
+
+def resolve_checkpoint_path(config=None, checkpoint_path=None):
+    """Resolve a local VGGT checkpoint or download the official HF weight."""
+    for path in _candidate_checkpoint_paths(config, checkpoint_path):
+        expanded = _resolve_project_path(path)
+        if os.path.isfile(expanded):
+            return expanded
+
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError as exc:
+        raise RuntimeError(
+            "VGGT checkpoint not found locally and huggingface_hub is not installed. "
+            "Set VGGT_CHECKPOINT or model.checkpoint_path to a local model.pt."
+        ) from exc
+
+    local_dir = _checkpoint_dir(config)
+    os.makedirs(local_dir, exist_ok=True)
+    return hf_hub_download(repo_id="facebook/VGGT-1B", filename="model.pt", local_dir=local_dir)
+
+
+def setup_model(config=None, checkpoint_path=None):
     """Initialize the VGGT model."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # bfloat16 is supported on Ampere GPUs (Compute Capability 8.0+) 
-    dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    # bfloat16 is supported on Ampere GPUs (Compute Capability 8.0+).
+    if device == "cuda":
+        dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    else:
+        dtype = torch.float32
     
     print("Loading VGGT model...")
+    ckpt_path = resolve_checkpoint_path(config=config, checkpoint_path=checkpoint_path)
     model = VGGT()
-    model.load_state_dict(torch.load(os.path.join(PROJECT_ROOT, "models/vggt/VGGT-1B/model.pt"), map_location=device))
+    model.load_state_dict(torch.load(ckpt_path, map_location=device))
 
     model = model.to(device)
     model.eval()
@@ -379,6 +435,11 @@ def extract_camera_paths(frame_data, base_path="dataset", camera_order=None):
 
 def download_file_from_url(url, filename):
     """Downloads a file from a Hugging Face model repo, handling redirects."""
+    try:
+        import requests
+    except ImportError as exc:
+        raise ImportError("requests is required only for downloading skyseg.onnx.") from exc
+
     try:
         # Get the redirect URL
         response = requests.get(url, allow_redirects=False)
@@ -643,6 +704,7 @@ def save_vggt_pcd(predictions, output_path, confidence_threshold=0.5, apply_sky_
         print(f"Total combined points: {len(combined_points)} from {len(all_points)} cameras (after y > 0.03 filtering)")
         
         # Create Open3D point cloud
+        o3d = require_open3d()
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(combined_points)
         
@@ -765,6 +827,7 @@ def save_vggt_pcd(predictions, output_path, confidence_threshold=0.5, apply_sky_
     print(f"Total combined points: {len(combined_points)} from {len(all_points)} cameras (after y > 0.03 filtering)")
     
     # Create Open3D point cloud
+    o3d = require_open3d()
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(combined_points)
     
@@ -803,8 +866,6 @@ def extract_frames(video_path, output_dir, num_frames=9):
     # Get video properties
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    duration = total_frames / fps if fps > 0 else 0
-    
     # Ensure output directory exists
     output_frames_dir = os.path.join(output_dir, os.path.basename(video_path).split('.')[0])
     os.makedirs(output_frames_dir, exist_ok=True)
@@ -836,265 +897,3 @@ def extract_frames(video_path, output_dir, num_frames=9):
 
     cap.release()
     return frames_list
-
-def process_egowalk_segments(config_path="vggt_pcd_configs.yml", segments_dir=None):
-    """Process all EgoWalk segments and compute scale factors using configuration."""
-    # Load configuration
-    config = load_config(config_path)
-    
-    if segments_dir is None:
-        segments_dir = os.path.join(PROJECT_ROOT, "dataset/Target_samples")
-    
-    # Setup model
-    model, device, dtype = setup_model()
-    
-    # Find all segment directories
-    segment_dirs = glob.glob(os.path.join(segments_dir, "*/"))
-    print(f"Found {len(segment_dirs)} EgoWalk segments to process")
-    
-    all_results = []
-    
-    for segment_dir in tqdm(segment_dirs, desc="Processing segments"):
-        print(f"\nProcessing segment: {os.path.basename(segment_dir.rstrip('/'))}")
-        
-        try:
-            # Extract segment name from directory
-            segment_name = os.path.basename(segment_dir.rstrip('/'))
-            
-            # Construct file paths based on segment name
-            current_frame_path = os.path.join(segment_dir, f"{segment_name}_current_frame.png")
-            first_frame_path = os.path.join(segment_dir, f"{segment_name}_first_frame.png")
-            metadata_path = os.path.join(segment_dir, f"{segment_name}_metadata.json")
-            
-            # Find world model generated video (starts with "Move")
-            video_files = glob.glob(os.path.join(segment_dir, "Move*.mp4"))
-            if not video_files:
-                print(f"Warning: No world model video found in {segment_dir}")
-                continue
-            video_path = video_files[0]  # Take the first one if multiple exist
-            
-            # Check if required files exist
-            if not all(os.path.exists(path) for path in [current_frame_path, first_frame_path, metadata_path]):
-                print(f"Warning: Missing required files in {segment_dir}")
-                continue
-            
-            # Load metadata to get real displacement
-            with open(metadata_path, 'r') as f:
-                metadata = json.load(f)
-            
-            real_displacement = metadata["distance_first_to_current"]["distance_meters"]
-            print(f"Real displacement: {real_displacement} meters")
-            
-            # Setup camera paths: current frame, reference frame, and world model predicted frames
-            camera_paths = []
-            
-            # Extract frames from world model generated video
-            print(f"Extracting frames from world model video: {os.path.basename(video_path)}")
-            temp_frame_dir = os.path.join(PROJECT_ROOT, "pipelines/vggt/output/video_frames")
-            os.makedirs(temp_frame_dir, exist_ok=True)
-            predicted_image_paths = extract_frames(video_path, temp_frame_dir)
-            camera_paths.extend(predicted_image_paths)
-            camera_paths.append(first_frame_path)
-
-            # Load and preprocess images
-            images = load_and_preprocess_images(camera_paths).to(device)
-            
-            # Run VGGT inference
-            with torch.no_grad():
-                with torch.cuda.amp.autocast(dtype=dtype):
-                    predictions = model(images)
-                
-                    images = images[None]  # add batch dimension
-                    aggregated_tokens_list, ps_idx = model.aggregator(images)
-                            
-                # Predict Cameras
-                pose_enc = model.camera_head(aggregated_tokens_list)[-1]
-                # Extrinsic and intrinsic matrices, following OpenCV convention (camera from world)
-                extrinsic, intrinsic = pose_encoding_to_extri_intri(pose_enc, images.shape[-2:])
-                
-                # Extract camera positions from extrinsic matrices (last column, first 3 elements)
-                # First camera: reference frame (first_frame.png)
-                # Second camera: first predicted frame from world model
-                camera1_position = extrinsic[0, 0, :3, 3]  # Reference frame position
-                camera2_position = extrinsic[0, -1, :3, 3]  # First predicted frame position
-                
-                # Calculate Euclidean distance between camera positions
-                camera_displacement = torch.norm(camera1_position - camera2_position).item()
-
-            # Compute scale factor
-            if camera_displacement == 0:
-                print(f"Warning: Zero camera displacement for segment {segment_name}")
-                scale_factor = float('inf')
-            else:
-                scale_factor = real_displacement / camera_displacement
-
-            print(f"Camera displacement: {camera_displacement}")
-            print(f"Scale factor: {scale_factor}")
-            
-            # Store results
-            result = {
-                'segment_name': segment_name,
-                'real_displacement': real_displacement,
-                'camera_displacement': camera_displacement,
-                'scale_factor': scale_factor,
-                'extrinsic': extrinsic.cpu().numpy() if torch.is_tensor(extrinsic) else extrinsic,
-                'intrinsic': intrinsic.cpu().numpy() if torch.is_tensor(intrinsic) else intrinsic
-            }
-            all_results.append(result)
-            
-        except Exception as e:
-            print(f"Error processing segment {segment_dir}: {e}")
-            continue
-    
-    return all_results
-
-def process_single_segment(segment_path, config_path="vggt_pcd_configs.yml", video_path=None):
-    """
-    Process a single EgoWalk segment and compute scale factor.
-    
-    Args:
-        segment_path: Path to the segment directory containing ground truth files
-        config_path: Path to VGGT configuration file
-        video_path: Optional path to world model video. If None, will search for Move*.mp4
-    """
-    # Load configuration
-    config = load_config(config_path)
-    
-    # Setup model
-    model, device, dtype = setup_model()
-    
-    segment_name = os.path.basename(segment_path.rstrip('/'))
-    print(f"Processing single segment: {segment_name}")
-    
-    try:
-        # Construct file paths based on segment name
-        current_frame_path = os.path.join(segment_path, f"{segment_name}_current_frame.png")
-        first_frame_path = os.path.join(segment_path, f"{segment_name}_first_frame.png")
-        metadata_path = os.path.join(segment_path, f"{segment_name}_metadata.json")
-        
-        # Get video path - either provided or search for Move*.mp4
-        if video_path is None:
-            # Find world model generated video (starts with "Move")
-            video_files = glob.glob(os.path.join(segment_path, "Move*.mp4"))
-            if not video_files:
-                print(f"Error: No world model video found in {segment_path}")
-                return None
-            video_path = video_files[0]
-        else:
-            # Use provided video path
-            if not os.path.exists(video_path):
-                print(f"Error: Provided video path does not exist: {video_path}")
-                return None
-        
-        # Check if required files exist
-        if not all(os.path.exists(path) for path in [current_frame_path, first_frame_path, metadata_path]):
-            print(f"Error: Missing required files in {segment_path}")
-            return None
-        
-        # Load metadata to get real displacement
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
-        
-        real_displacement = metadata["distance_first_to_current"]["distance_meters"]
-        print(f"Real displacement: {real_displacement} meters")
-        
-        # Setup camera paths: current frame, reference frame, and world model predicted frames
-        camera_paths = [first_frame_path]
-        
-        # Extract frames from world model generated video
-        print(f"Extracting frames from world model video: {os.path.basename(video_path)}")
-        temp_frame_dir = os.path.join(PROJECT_ROOT, "pipelines/vggt/output/video_frames")
-        os.makedirs(temp_frame_dir, exist_ok=True)
-        predicted_image_paths = extract_frames(video_path, temp_frame_dir)
-        camera_paths.extend(predicted_image_paths)
-        
-        print(f"Processing segment {segment_name} with {len(camera_paths)} images")
-        
-        # Load and preprocess images
-        images = load_and_preprocess_images(camera_paths).to(device)
-        
-        # Run VGGT inference
-        with torch.no_grad():
-            with torch.cuda.amp.autocast(dtype=dtype):
-                predictions = model(images)
-            
-                images = images[None]  # add batch dimension
-                aggregated_tokens_list, ps_idx = model.aggregator(images)
-                        
-            # Predict Cameras
-            pose_enc = model.camera_head(aggregated_tokens_list)[-1]
-            # Extrinsic and intrinsic matrices, following OpenCV convention (camera from world)
-            extrinsic, intrinsic = pose_encoding_to_extri_intri(pose_enc, images.shape[-2:])
-            
-            # Extract camera positions from extrinsic matrices (last column, first 3 elements)
-            # First camera: reference frame (first_frame.png)
-            # Second camera: first predicted frame from world model
-            camera1_position = extrinsic[0, 0, :3, 3]  # Reference frame position
-            camera2_position = extrinsic[0, 1, :3, 3]  # First predicted frame position
-            
-            # Calculate Euclidean distance between camera positions
-            camera_displacement = torch.norm(camera1_position - camera2_position).item()
-
-        # Compute scale factor
-        if camera_displacement == 0:
-            print(f"Warning: Zero camera displacement for segment {segment_name}")
-            scale_factor = float('inf')
-        else:
-            scale_factor = real_displacement / camera_displacement
-
-        print(f"Camera displacement: {camera_displacement}")
-        print(f"Scale factor: {scale_factor}")
-        
-        # Return results
-        result = {
-            'segment_name': segment_name,
-            'real_displacement': real_displacement,
-            'camera_displacement': camera_displacement,
-            'scale_factor': scale_factor,
-            'extrinsic': extrinsic.cpu().numpy() if torch.is_tensor(extrinsic) else extrinsic,
-            'intrinsic': intrinsic.cpu().numpy() if torch.is_tensor(intrinsic) else intrinsic
-        }
-        
-        return result
-        
-    except Exception as e:
-        print(f"Error processing segment {segment_path}: {e}")
-        return None
-
-if __name__ == "__main__":
-    # Process all EgoWalk segments
-    results = process_egowalk_segments()
-    print("Processing complete!")
-    
-    # Print summary statistics
-    if results:
-        scale_factors = [r['scale_factor'] for r in results if r['scale_factor'] != float('inf')]
-        if scale_factors:
-            print(f"\nSummary Statistics:")
-            print(f"Number of processed segments: {len(results)}")
-            print(f"Valid scale factors: {len(scale_factors)}")
-            print(f"Mean scale factor: {np.mean(scale_factors):.4f}")
-            print(f"Median scale factor: {np.median(scale_factors):.4f}")
-            print(f"Std scale factor: {np.std(scale_factors):.4f}")
-            print(f"Min scale factor: {np.min(scale_factors):.4f}")
-            print(f"Max scale factor: {np.max(scale_factors):.4f}")
-        
-        # Save results to JSON file
-        output_file = os.path.join(PROJECT_ROOT, "pipelines/vggt/output/scale_factor_results.json")
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        
-        # Convert numpy arrays to lists for JSON serialization
-        results_serializable = []
-        for result in results:
-            result_copy = result.copy()
-            if 'extrinsic' in result_copy:
-                result_copy['extrinsic'] = result_copy['extrinsic'].tolist()
-            if 'intrinsic' in result_copy:
-                result_copy['intrinsic'] = result_copy['intrinsic'].tolist()
-            results_serializable.append(result_copy)
-        
-        with open(output_file, 'w') as f:
-            json.dump(results_serializable, f, indent=2)
-        print(f"Results saved to: {output_file}")
-    else:
-        print("No segments were successfully processed.")

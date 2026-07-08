@@ -1,0 +1,24 @@
+# Minimal Target-Bench evaluation runtime for the supported backbones:
+# VGGT, Depth Anything 3, and VGGT-Omega.
+#
+# set_env.sh installs VGGT and VGGT-Omega with --no-deps. DA3 is used from
+# models/da3/src directly by the evaluation adapter, so upstream demo, server,
+# export, and benchmark dependencies are not pulled in.
+
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.11.0+cu126
+torchvision==0.26.0+cu126
+numpy==1.26.4
+Pillow==12.3.0
+opencv-python==4.11.0.86
+PyYAML==6.0.3
+pandas==2.3.3
+matplotlib==3.10.9
+tqdm==4.67.3
+huggingface_hub==1.22.0
+modelscope==1.34.0
+einops==0.8.2
+safetensors==0.8.0
+scipy==1.15.3
+omegaconf==2.3.1

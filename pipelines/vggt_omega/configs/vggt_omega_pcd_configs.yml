@@ -1,0 +1,29 @@
+# VGGT-Omega pipeline config for target-bench evaluation.
+
+model:
+  model_name: VGGT-Omega-1B-512
+  hf_repo_id: facebook/vggt-omega
+  checkpoint_filename: vggt_omega_1b_512.pt
+
+  # Optional local checkpoint path. If empty, the evaluator tries to download
+  # checkpoint_filename from hf_repo_id. You can also set VGGT_OMEGA_CHECKPOINT.
+  checkpoint_path: ""
+  checkpoint_dir: checkpoints/vggt_omega
+
+  # Optional local official repo/source paths. You can also set
+  # VGGT_OMEGA_REPO_DIR or VGGT_OMEGA_SRC_DIR in the environment.
+  model_source_paths: []
+
+  # The text-aligned checkpoint should use enable_alignment: true and
+  # image_resolution: 256. The 1B-512 checkpoint uses false/512.
+  enable_alignment: false
+
+video:
+  # Uniformly sample frames across each evaluated video, then append the
+  # benchmark first_frame image for scale alignment.
+  num_frames: 9
+
+preprocess:
+  image_resolution: 512
+  mode: balanced
+  patch_size: 16

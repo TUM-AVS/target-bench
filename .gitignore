@@ -1,36 +1,80 @@
-# python
-*.pyc
-**/__pycache__/
-.pytest_cache/*
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.cache/
+*.egg-info/
+build/
+dist/
+htmlcov/
+.coverage
+coverage.xml
+
+# Local environments
+.env
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
 .pydevproject
 
-# IDE
-.vscode/
+# Local agent state
+.codex/
+.agents/
 
-# Pip
-*.egg-info
+# Local external checkouts/caches
+third_party/
+tmp/
+temp/
+outputs/
+wandb/
 
-# files
+# Logs
+logs/
 *.log
-*.pkl
-*.jpg
-*.pcd
-
-# exp
-exp
-
-# data
-dataset/wm_videos/*
-dataset/Benchmark/*
-video_frames
-DiffSynth-Studio/models/train/ckpts/*
-DiffSynth-Studio/dataset/*
-# vggt code
-models/vggt/VGGT-1B
-
-# models
-DiffSynth-Studio/models/Wan-AI
-# lsf
+*.out
+*.err
 *.bsub
 
-evaluation_results
+# Data and evaluation outputs
+dataset/Benchmark/
+dataset/wm_videos/
+dataset/Target_samples/
+dataset/*.tar
+dataset/*.zip
+dataset/data_*/
+evaluation_results/
+exp/
+video_frames/
+**/video_frames/
+
+# Model weights and large generated artifacts
+checkpoints/
+models/da3/.git/
+models/Depth-Anything-3
+models/vggt/VGGT-1B/
+models/vggt-omega/.git/
+models/vggt-omega/checkpoints/
+**/checkpoints/
+**/ckpts/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.pkl
+*.pcd
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# DiffSynth local data
+DiffSynth-Studio/models/train/ckpts/
+DiffSynth-Studio/models/Wan-AI/
+DiffSynth-Studio/dataset/
