@@ -28,9 +28,9 @@ If you find our work useful, please give us a star ⭐! Your support drives us t
 
 ## News
 
-- **[2026.07]** Target-Bench is using [VGGT-Omega](https://vggt-omega.github.io/) as the default evaluation backbone.
-- **[2026.06]** 🎉 Target-Bench is accepted by ECCV 2026! See you September in Malmö 🇸🇪
-- **[2026.01]** We release the training code for fine-tuning world models.
+- **[2026.07]** 🚀 Target-Bench is using [VGGT-Omega](https://vggt-omega.github.io/) as the default evaluation backbone.
+- **[2026.06]** 🎉 Target-Bench is accepted by ECCV 2026 🥳! See you September in Malmö 🇸🇪
+- **[2026.01]** 🔥 We release the training code for fine-tuning world models.
 - **[2025.11]** We release the paper, dataset, benchmark code, and project website.
 
 ## Contents
